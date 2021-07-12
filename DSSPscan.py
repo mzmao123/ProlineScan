@@ -32,15 +32,6 @@ def prolineSuperimpose(targetResidue, movingResidue):
     proline2 = movingResidue
     fixedAtoms = [atom for atom in proline1 if atom.name in ["C", "N", "O", "CA"]]
     movingAtoms = [atom for atom in proline2 if atom.name in ["C", "N", "O", "CA"]]
-    print("Fixed Atoms ")
-    for atom in fixedAtoms:
-        print(str(atom) + " " + str(atom.get_coord()))
-    print("Moving Atoms ")
-    for atom in movingAtoms:
-        print(str(atom) + " " + str(atom.get_coord()))
     sup.set_atoms(fixedAtoms,movingAtoms)
-    movingModel = proline1.get_parent()
-    print(sup.rotran)
-    print(sup.rms)
-    sup.apply(movingModel.get_atoms())
-    return proline2
+    sup.apply(proline2)
+    return sup.rms
