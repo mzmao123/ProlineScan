@@ -1,4 +1,6 @@
 # suggestions
-- variable name dict  (dsspList)
-- form XXX import *
-- function name prolineSuperimpose -> backboneSuperimpose
+- variable name dict  (dsspList): dict is a reserved key word of python (so does list, tupple)
+- form XXX import * : it is better to do the import explicitly
+- function name prolineSuperimpose -> backboneSuperimpose is better fit its function
+
+- proline conformations: we may need functions to save and load the conformations for later access
