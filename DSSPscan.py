@@ -2,6 +2,7 @@ from PDBtoDSSP import pdb_to_dssp
 from Bio.PDB import *
 from Bio.PDB.DSSP import *
 import numpy as np
+import math
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import json
@@ -48,6 +49,7 @@ def conformationPlot(fileName, fileDirectory,dsspFile):
         v3 = CB.get_vector()
         v4 = CG.get_vector()
         angle = calc_dihedral(v1,v2,v3,v4)
+        angle = angle*(180/math.pi)
         return angle
 
     def prolineList(fileName,fileDirectory):
@@ -92,6 +94,12 @@ def conformationPlot(fileName, fileDirectory,dsspFile):
     ydata = np.array(dataTuple[1])
     xdata = np.array(dataTuple[0])
     ax.scatter3D(xdata,ydata,zdata,c=zdata,cmap='Greens')
+    plt.xlabel("Phi Angle")
+    plt.ylabel("Psi Angle")
+    ax.set_zlabel("Chi Angle")
+    ax.set_zlim(-180,180)
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-200, 200)
     plt.show()
 
 conformationPlot("7dwy","test/7dwy.pdb","test/DSSP7dwy.dssp")
