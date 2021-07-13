@@ -1,0 +1,4 @@
+# suggestions
+- variable name dict  (dsspList)
+- form XXX import *
+- function name prolineSuperimpose -> backboneSuperimpose
