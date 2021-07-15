@@ -88,7 +88,7 @@ def psiPhiChi (fileName, fileDirectory, dsspFile): #creates a list of psi and ph
         allPsi.append((dsspList(dsspFile,id))[3])
         allPhi.append((dsspList(dsspFile,id))[2])
     return(allPhi,allPsi,allChi)
-
+'''
 def conformationPlot(fileName, fileDirectory,dsspFile): #This takes the results from psiPhiChi and plots them on a 3d axis
     fig = plt.figure()
     ax = plt.axes(projection='3d')
@@ -104,7 +104,14 @@ def conformationPlot(fileName, fileDirectory,dsspFile): #This takes the results 
     ax.set_xlim(-180, 180)
     ax.set_ylim(-200, 200)
     plt.show()
+'''
+def toNum (value): #turns an exponential into a decimal
+    valWO = value.split('e')
+    ret_val = format(((float(valWO[0]))*(10**int(valWO[1]))), '.8f')
+    return ret_val
 
+
+'''
 def compatiblePositions(fileName,fileDirectory,dsspFile,dataFile):  #scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
 
     def toNum (value): #turns an exponential into a decimal
@@ -140,9 +147,109 @@ def compatiblePositions(fileName,fileDirectory,dsspFile,dataFile):  #scans all t
         if phiPsi in angleList:
             listCompatible.append(id)
     return listCompatible
+'''
 
-print(compatiblePositions("7dwy","test/7dwy.pdb","test/DSSP7dwy.dssp","test/rama8000-transpro.data"))
+class backboneCompatibility():
+    def __init__(self,contourPlot):
+        self.angleDict = {}
+        self.anglesCutoff = []
+        with open(contourPlot) as file:
+            self.lines = file.readlines()
+            for line in self.lines:
+                line = line.split()
+                prob = float(line[2])
+                try:
+                    prob = float(toNum(str(prob)))
+                except IndexError:
+                    pass
+                angVal = (float(line[0]),float(line[1]))
+                self.angleDict[angVal] = prob
+    # scans the database for acceptable conformations. The probability of a conformation has to be greater than 0.01
+            for line in self.lines:
+                line = line.split()
+                prob = float(line[2])
+                try:
+                    prob = float(toNum(str(prob)))
+                except IndexError:
+                    pass
+                if prob > 0.01:
+                    self.anglesCutoff.append([float(line[0]), float(line[1])])
+
+    def returnProb(phiPsi,self):
+        return self.angleDict[phiPsi]
 
 
+    def compatiblePositions(self,struct,dsspFile):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
 
+        angleList = self.anglesCutoff
+        idList = []
+        listCompatible = []
+        model = struct[0]
 
+        for chain in model:
+            for residue in chain:
+                addition = (chain.id,residue.id)
+                idList.append(addition)
+
+        for id in idList:  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
+            phiPsi = []
+            tempList = dsspList(dsspFile, id)
+            phiPsi.extend([tempList[2], tempList[3]])
+            if phiPsi in angleList:
+                listCompatible.append(id)
+        return listCompatible
+
+    def conformationPlot(fileName, fileDirectory,dsspFile):  # This takes the results from psiPhiChi and plots them on a 3d axis
+        dataTuple = psiPhiChi(fileName, fileDirectory, dsspFile)
+        return dataTuple
+
+class prolineConformation():
+    def __init__(self, fileName, dsspFile, fileDirectory):
+
+        def prolineDict(fileName,fileDirectory):  # takes a pdb file and returns a dictionary of prolines with the key being the chain. This function is also repurposed to calculate the chi angles for all of the prolines in the file.
+            returnDict = {}
+            structure = parser.get_structure(fileName, fileDirectory)
+            model = structure[0]
+            for chain in model:
+                resID = []
+                for residue in chain:
+                    if residue.get_resname() == "PRO":
+                        resID.append(residue.id)
+                    else:
+                        pass
+                returnDict[chain.id] = resID  # eg. {'A': [(id1),(id2),(id3)]]
+            return (returnDict)
+        def idCreation(residueDictionary):  # takes the return dictioary from the function prolineDict and creates a new list of tuples which can be accepted by the dsspList function
+            keyList = []
+            for key in residueDictionary:
+                for i in residueDictionary[key]:
+                    addition = (key,i)  # this would look like ('A",("",80,"")) which is the id that is accepted by the dsspList function
+                    keyList.append(addition)
+            return keyList
+        idList = idCreation(prolineDict(fileName,fileDirectory))
+        self.conformDict = {}
+        self.psiList = []
+        self.phiList = []
+        for id in idList:
+            angleList = dsspList(dsspFile, id)
+            key = (angleList[2],angleList[3])
+            self.conformDict[key] = id
+            self.phiList.append(angleList[2])
+            self.psiList.append(angleList[3])
+
+    def similarPair(phiPsi,self):
+        phi = phiPsi[0]
+        psi = phiPsi[1]
+        diff = 10000
+        returnPhi = 0
+        returnPsi = 0
+
+        for i in range(len(self.phiList)):
+            distance = abs((self.phiList[i]-phi)+(self.psiList[i]-psi))
+            if (distance)<diff:
+                diff = distance
+                returnPhi = self.phiList[i]
+                returnPsi = self.psiList[i]
+
+        return [returnPhi,returnPsi]
+#def mutateSite(strucuture,residue):
