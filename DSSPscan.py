@@ -252,4 +252,13 @@ class prolineConformation():
                 returnPsi = self.psiList[i]
 
         return [returnPhi,returnPsi]
-#def mutateSite(strucuture,residue):
+def mutateSite(structure,residue):
+    chain = residue.get_parent()
+    resId = residue.id
+    replaceID = resId[1]
+    chain.detach_child(resId)
+    libraryStructure = parser.get_structure("7dwy","test/7dwy.pdb")
+    replacePro = libraryStructure[0]["A"][809]
+    replacePro.id = resId
+    chain.insert(replaceID,replacePro)
+    return chain[resId]

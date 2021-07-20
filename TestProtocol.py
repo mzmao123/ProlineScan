@@ -3,6 +3,7 @@ from Bio.PDB import *
 from DSSPscan import backboneSuperimpose
 from DSSPscan import backboneCompatibility as BC
 from DSSPscan import prolineConformation as PC
+from DSSPscan import mutateSite
 import numpy as np
 parser = PDBParser(PERMISSIVE=1)
 class TestProlineSuperimpose(unittest.TestCase):
@@ -30,3 +31,11 @@ class TestProlineConformation(unittest.TestCase):
         result = PC("7dwy", "test/DSSP7dwy.dssp", "test/7dwy.pdb")
         result = PC.similarPair([-76.7,167.9],result)
         self.assertEqual(result,[-76.7,167.9])
+class TestMutateSite(unittest.TestCase):
+    def test_mutateSite(self):
+        testStructure = parser.get_structure("7dwy","test/7dwyTest.pdb")
+        structure1 = parser.get_structure("7dwy","test/7dwy.pdb")
+        modifiedGly = testStructure[0]["A"][809]
+        result = mutateSite(testStructure,modifiedGly)
+        expected = structure1[0]["A"][809]
+        self.assertEqual(result,expected)
