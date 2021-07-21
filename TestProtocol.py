@@ -24,7 +24,7 @@ class TestBackboneCompatibility(unittest.TestCase):
         structure = parser.get_structure("test", "test/test.pdb")
         result = BC("test/rama8000-transpro.data")
         result = BC.compatiblePositions(result,structure,"test/DSSPtest.dssp")
-        expected = []
+        expected = [('A', (' ', 23, ' ')), ('A', (' ', 38, ' '))]
         self.assertEqual(expected,result)
 class TestProlineConformation(unittest.TestCase):
     def test_similarPair(self):

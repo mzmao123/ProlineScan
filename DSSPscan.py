@@ -194,9 +194,10 @@ class backboneCompatibility():
         for id in idList:  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
             phiPsi = []
             tempList = dsspList(dsspFile, id)
-            phiPsi.extend([tempList[2], tempList[3]])
+            phiPsi.extend([int(tempList[2]), int(tempList[3])])
             if phiPsi in angleList:
                 listCompatible.append(id)
+                print(phiPsi)
         return listCompatible
 
     def conformationPlot(fileName, fileDirectory,dsspFile):  # This takes the results from psiPhiChi and plots them on a 3d axis
