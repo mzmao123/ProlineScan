@@ -8,7 +8,7 @@ import numpy as np
 parser = PDBParser(PERMISSIVE=1)
 class TestProlineSuperimpose(unittest.TestCase):
     def test_prolineSuperimpose(self):
-        structure = parser.get_structure("7dwyTest","test/7dwyTest.pdb")
+        structure = parser.get_structure("7dwyTest","test/7dwyTestSuperimpose.pdb")
         targetResidue = structure[0]["A"][807]
         movingResidue = structure[0]["A"][809]
         result = backboneSuperimpose(targetResidue,movingResidue)
@@ -17,14 +17,14 @@ class TestProlineSuperimpose(unittest.TestCase):
 class TestBackboneCompatibility(unittest.TestCase):
     def test_probability(self):
         result = BC("test/rama8000-transpro.data")
-        phiPsi = (-99.0,-19.0)
+        phiPsi = (round(-84.9),round(-7.1))
         result = BC.returnProb(phiPsi,result)
-        self.assertEqual(result,0.001341088541980592)
+        self.assertEqual(result,0.09410222409740221)
     def test_compatiblePositions(self):
         structure = parser.get_structure("test", "test/test.pdb")
         result = BC("test/rama8000-transpro.data")
         result = BC.compatiblePositions(result,structure,"test/DSSPtest.dssp")
-        expected = [('A', (' ', 23, ' ')), ('A', (' ', 38, ' '))]
+        expected = [('A', (' ', 18, ' ')), ('A', (' ', 22, ' ')), ('A', (' ', 23, ' ')), ('A', (' ', 25, ' ')), ('A', (' ', 26, ' ')), ('A', (' ', 32, ' ')), ('A', (' ', 38, ' ')), ('A', (' ', 39, ' ')), ('A', (' ', 43, ' ')), ('A', (' ', 54, ' '))]
         self.assertEqual(expected,result)
 class TestProlineConformation(unittest.TestCase):
     def test_similarPair(self):
@@ -33,9 +33,9 @@ class TestProlineConformation(unittest.TestCase):
         self.assertEqual(result,[-76.7,167.9])
 class TestMutateSite(unittest.TestCase):
     def test_mutateSite(self):
-        testStructure = parser.get_structure("7dwy","test/7dwyTest.pdb")
+        testStructure = parser.get_structure("7dwy","test/7dwyTestMutateSite.pdb")
         structure1 = parser.get_structure("7dwy","test/7dwy.pdb")
         modifiedGly = testStructure[0]["A"][809]
-        result = mutateSite(testStructure,modifiedGly)
+        result = mutateSite(testStructure,modifiedGly.get_full_id())
         expected = structure1[0]["A"][809]
         self.assertEqual(result,expected)

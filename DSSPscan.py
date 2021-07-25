@@ -1,11 +1,14 @@
 from PDBtoDSSP import pdb_to_dssp
 from Bio.PDB import PDBParser, Superimposer, calc_dihedral
-from Bio.PDB.DSSP import *
+from Bio.PDB.DSSP import make_dssp_dict
+from Bio.PDB.SASA import *
 import numpy as np
 import math
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import json
+from PDBtoDSSP import pdb_to_dssp
+from Bio.PDB.PDBIO import PDBIO
 parser = PDBParser(PERMISSIVE=1)
 def dsspList(dsspFile,id):
 
@@ -30,6 +33,23 @@ def dsspList(dsspFile,id):
     dssp_dict = tupleToList(temp_dict)
     dssp_dict = listRemove(dssp_dict)
     return dssp_dict[id] # id required should be in this format ('A', (' ', 14, ' ')), 'A' is the name of the chain
+
+def dsspListWORemove(dsspFile,id):
+    def tupleToList(dsspDict): #turns the tuple definitions of the key into lists for better manipulation
+        returnDict = {}
+        for key in dsspDict:
+            returnDict[key] = list(dsspDict[key])
+        return returnDict
+    def dsspDictionarty(dsspFile): #creates the dictionary for each resiude containing all of the values
+        returnDict = {}
+        returnDict = make_dssp_dict(dsspFile)
+        return returnDict
+
+    dssp_tuple = dsspDictionarty(dsspFile)
+    temp_dict = dssp_tuple[0]
+    dssp_dict = tupleToList(temp_dict)
+
+    return dssp_dict[id]
 
 def backboneSuperimpose(residue1, residue2): #Fucntion will superimpose two given residues
     sup = Superimposer()
@@ -182,6 +202,13 @@ class backboneCompatibility():
     def compatiblePositions(self,struct,dsspFile):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
 
         angleList = self.anglesCutoff
+        phiList = []
+        psiList = []
+
+        for lis in angleList:
+            phiList.append(lis[0])
+            psiList.append(lis[1])
+
         idList = []
         listCompatible = []
         model = struct[0]
@@ -194,10 +221,26 @@ class backboneCompatibility():
         for id in idList:  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
             phiPsi = []
             tempList = dsspList(dsspFile, id)
-            phiPsi.extend([int(tempList[2]), int(tempList[3])])
-            if phiPsi in angleList:
-                listCompatible.append(id)
-                print(phiPsi)
+            phiPsi.extend([round(tempList[2]), round(tempList[3])])
+            phi = round(tempList[2])
+            psi = round(tempList[3])
+
+            #if phiPsi in angleList or [phiPsi[0]+1,phiPsi[1]] in angleList or[phiPsi[0],phiPsi[1]+1] in angleList or [phiPsi[0]+1,phiPsi[1]+1] in angleList or [phiPsi[0]-1,phiPsi[1]] in angleList or [phiPsi[0],phiPsi[1]-1] in angleList or [phiPsi[0]-1,phiPsi[1]-1] in angleList or [phiPsi[0]-1,phiPsi[1]+1] in angleList or [phiPsi[0]+1,phiPsi[1]-1] in angleList:
+            phiRange = set([phi-1,phi,phi+1])
+            psiRange = set([psi-1,psi,psi+1])
+            psiSet = set(psiList)
+            phiSet = set(phiList)
+            phiIntersectVal = phiSet.intersection(phiRange)
+            psiIntersectVal = psiSet.intersection(psiRange)
+
+            for val in phiIntersectVal:
+                for val2 in psiIntersectVal:
+                    if [val,val2] in angleList:
+                        if id not in listCompatible:
+                            listCompatible.append(id)
+                        else:
+                            pass
+                        break
         return listCompatible
 
     def conformationPlot(fileName, fileDirectory,dsspFile):  # This takes the results from psiPhiChi and plots them on a 3d axis
@@ -251,10 +294,13 @@ class prolineConformation():
                 diff = distance
                 returnPhi = self.phiList[i]
                 returnPsi = self.psiList[i]
-
         return [returnPhi,returnPsi]
-def mutateSite(structure,residue):
-    chain = residue.get_parent()
+
+def mutateSite(structure,residueFullID):
+    newStructure = structure.copy()
+    orgStruct = structure
+    chain = newStructure[residueFullID[1]][residueFullID[2]]
+    residue  = chain[residueFullID[3]]
     resId = residue.id
     replaceID = resId[1]
     chain.detach_child(resId)
@@ -262,4 +308,48 @@ def mutateSite(structure,residue):
     replacePro = libraryStructure[0]["A"][809]
     replacePro.id = resId
     chain.insert(replaceID,replacePro)
+    replacementCost(orgStruct,newStructure,chain.id,resId,chain[resId],residueFullID[1])
     return chain[resId]
+
+def distanceBetweenResidues(residue):
+    collisions = 0
+    contacts = 0
+    chain = residue.get_parent()
+    id = residue.get_id()[1]
+    for res in chain:
+        if res != residue:
+            try:
+               distance = res["CA"]-residue["CA"]
+            except KeyError:
+                continue
+            if abs(distance)<=4.5:
+                contacts+=1
+            if abs(distance)<=2.8:
+                collisions+=1
+
+    return [collisions,contacts]
+
+def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, modelID):
+    io = PDBIO()
+    io.set_structure(newStructure)
+    io.save("structureFile.pdb")
+    import os
+    modifiedStructureDSSP = pdb_to_dssp("structureFile.pdb","https://www3.cmbi.umcn.nl/xssp/")
+    file = open("structureFile.dssp", "w")
+    file.write(modifiedStructureDSSP)
+    file.close()
+    structureDict = make_dssp_dict("structureFile.dssp")
+    id = (chainId, resId)
+    listVal = dsspListWORemove("structureFile.dssp",id)
+    print(listVal)
+    sr = ShrakeRupley()
+    sr.compute(mutatedResidue, level='R')
+    asa = mutatedResidue.sasa
+    n_collisions = distanceBetweenResidues(mutatedResidue)[0]
+    resNum = resId[1]
+    n_contacts_wt = distanceBetweenResidues(orgStrcut[modelID][chainId][resNum])[1]
+    n_contacts_pro = distanceBetweenResidues(mutatedResidue)[1]
+    costTuple = (listVal[3],listVal[4],asa,listVal[1],n_collisions,n_contacts_wt,n_contacts_pro) #phi,psi,asa,sse...
+    print(costTuple)
+    os.remove("structureFile.dssp")
+    os.remove("structureFile.pdb")
