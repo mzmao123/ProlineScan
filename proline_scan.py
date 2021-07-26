@@ -6,7 +6,7 @@ import argparse
 def parse():
     parser = argparse.ArgumentParser(description="Check proline compatbible positions in a given structure and the potential cost of mutate them to proline") 
     parser.add_argument('pdbfile', help='Input structure (in pdb format)')
-    parser.add_argument('--prob_cutoff', help='Probability cutoff for the compatible mainchain phi-psi angles', default=0.01, type=float)
+    parser.add_argument('--prob_cutoff', help='Probability cutoff for the compatible mainchain phi-psi angles (default: 0.01)', default=0.01, type=float)
     parser.add_argument('--dist_collision', help='XXX', default=2.8, type=float)
     parser.add_argument('--dist_contact_0', help='XXX', default=3.0, type=float)
     parser.add_argument('--dist_contact_1', help='XXX', default=4.5, type=float)
