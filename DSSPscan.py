@@ -7,9 +7,12 @@ import math
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import json
+import os
 from PDBtoDSSP import pdb_to_dssp
 from Bio.PDB.PDBIO import PDBIO
+from collections import namedtuple
 parser = PDBParser(PERMISSIVE=1)
+
 def dsspList(dsspFile,id):
 
     def tupleToList(dsspDict): #turns the tuple definitions of the key into lists for better manipulation
@@ -297,48 +300,61 @@ class prolineConformation():
         return [returnPhi,returnPsi]
 
 def mutateSite(structure,residueFullID):
+
     newStructure = structure.copy()
     orgStruct = structure
     chain = newStructure[residueFullID[1]][residueFullID[2]]
-    residue  = chain[residueFullID[3]]
-    resId = residue.id
+    res = chain[residueFullID[3]]
+    count = 0
+    for residue in chain:
+        if residue != res:
+            count+=1
+        else:
+            break
+    resId = res.id
     replaceID = resId[1]
     chain.detach_child(resId)
     libraryStructure = parser.get_structure("7dwy","test/7dwy.pdb")
     replacePro = libraryStructure[0]["A"][809]
     replacePro.id = resId
-    chain.insert(replaceID,replacePro)
+    chain.insert(count,replacePro)
+    io = PDBIO()
+    io.set_structure(newStructure)
+    io.save("structureFile.pdb")
     replacementCost(orgStruct,newStructure,chain.id,resId,chain[resId],residueFullID[1])
     return chain[resId]
 
 def distanceBetweenResidues(residue):
     collisions = 0
+    mainChainAtoms = ["C", "N", "O", "CA"]
+    mutatedResidueSideChain = []
+    for atom in residue:
+        if atom.get_name() not in mainChainAtoms:
+            mutatedResidueSideChain.append(atom)
     contacts = 0
     chain = residue.get_parent()
     id = residue.get_id()[1]
     for res in chain:
         if res != residue:
-            try:
-               distance = res["CA"]-residue["CA"]
-            except KeyError:
-                continue
-            if abs(distance)<=4.5:
-                contacts+=1
-            if abs(distance)<=2.8:
-                collisions+=1
-
+            distance = 0
+            for atom in res:
+                if atom.get_name() not in mainChainAtoms:
+                    for mutateAtom in mutatedResidueSideChain:
+                        distance = abs(mutateAtom-atom)
+                        if abs(distance)<=4.5:
+                            contacts+=1
+                        if abs(distance)<=2.8:
+                            collisions+=1
     return [collisions,contacts]
 
 def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, modelID):
     io = PDBIO()
     io.set_structure(newStructure)
     io.save("structureFile.pdb")
-    import os
     modifiedStructureDSSP = pdb_to_dssp("structureFile.pdb","https://www3.cmbi.umcn.nl/xssp/")
     file = open("structureFile.dssp", "w")
     file.write(modifiedStructureDSSP)
     file.close()
-    structureDict = make_dssp_dict("structureFile.dssp")
     id = (chainId, resId)
     listVal = dsspListWORemove("structureFile.dssp",id)
     print(listVal)
@@ -349,7 +365,9 @@ def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, mode
     resNum = resId[1]
     n_contacts_wt = distanceBetweenResidues(orgStrcut[modelID][chainId][resNum])[1]
     n_contacts_pro = distanceBetweenResidues(mutatedResidue)[1]
-    costTuple = (listVal[3],listVal[4],asa,listVal[1],n_collisions,n_contacts_wt,n_contacts_pro) #phi,psi,asa,sse...
+    ACC = listVal[2]
+    mutate_Cost = namedtuple("Mutate_Cost",['phi', 'psi', 'SASA', 'SSE', 'ACC', 'n_collisions', 'n_contacts_wt', 'n_contacts_pro'])
+    costTuple = mutate_Cost(listVal[3], listVal[4], asa, listVal[1], ACC, n_collisions, n_contacts_wt, n_contacts_pro) #phi,psi,asa,sse...
     print(costTuple)
-    os.remove("structureFile.dssp")
-    os.remove("structureFile.pdb")
+    #os.remove("structureFile.dssp")
+    #os.remove("structureFile.pdb")

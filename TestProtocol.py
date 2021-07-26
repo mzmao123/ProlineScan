@@ -4,6 +4,7 @@ from DSSPscan import backboneSuperimpose
 from DSSPscan import backboneCompatibility as BC
 from DSSPscan import prolineConformation as PC
 from DSSPscan import mutateSite
+from DSSPscan import distanceBetweenResidues
 import numpy as np
 parser = PDBParser(PERMISSIVE=1)
 class TestProlineSuperimpose(unittest.TestCase):
@@ -39,3 +40,9 @@ class TestMutateSite(unittest.TestCase):
         result = mutateSite(testStructure,modifiedGly.get_full_id())
         expected = structure1[0]["A"][809]
         self.assertEqual(result,expected)
+class TestDistanceBetween(unittest.TestCase):
+    def test_distanceBetween(self):
+        structure = parser.get_structure("7dwy", "test/7dwy.pdb")
+        proline = structure[0]["A"][809]
+        result = distanceBetweenResidues(proline)
+        print(result)
