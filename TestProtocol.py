@@ -17,13 +17,13 @@ class TestProlineSuperimpose(unittest.TestCase):
 
 class TestBackboneCompatibility(unittest.TestCase):
     def test_probability(self):
-        result = BC("test/rama8000-transpro.data")
+        result = BC("test/rama8000-transpro.data",0.01)
         phiPsi = (round(-84.9),round(-7.1))
         result = BC.returnProb(phiPsi,result)
         self.assertEqual(result,0.09410222409740221)
     def test_compatiblePositions(self):
         structure = parser.get_structure("test", "test/test.pdb")
-        result = BC("test/rama8000-transpro.data")
+        result = BC("test/rama8000-transpro.data",0.01)
         result = BC.compatiblePositions(result,structure,"test/DSSPtest.dssp")
         expected = [('A', (' ', 18, ' ')), ('A', (' ', 22, ' ')), ('A', (' ', 23, ' ')), ('A', (' ', 25, ' ')), ('A', (' ', 26, ' ')), ('A', (' ', 32, ' ')), ('A', (' ', 38, ' ')), ('A', (' ', 39, ' ')), ('A', (' ', 43, ' ')), ('A', (' ', 54, ' '))]
         self.assertEqual(expected,result)
@@ -37,7 +37,7 @@ class TestMutateSite(unittest.TestCase):
         testStructure = parser.get_structure("7dwy","test/7dwyTestMutateSite.pdb")
         structure1 = parser.get_structure("7dwy","test/7dwy.pdb")
         modifiedGly = testStructure[0]["A"][809]
-        result = mutateSite(testStructure,modifiedGly.get_full_id())
+        result = mutateSite("test/7dwyTestMutateSite.pdb",modifiedGly.get_full_id())
         expected = structure1[0]["A"][809]
         self.assertEqual(result,expected)
 class TestDistanceBetween(unittest.TestCase):

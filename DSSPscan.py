@@ -1,4 +1,3 @@
-from PDBtoDSSP import pdb_to_dssp
 from Bio.PDB import PDBParser, Superimposer, calc_dihedral
 from Bio.PDB.DSSP import make_dssp_dict
 from Bio.PDB.SASA import *
@@ -111,69 +110,14 @@ def psiPhiChi (fileName, fileDirectory, dsspFile): #creates a list of psi and ph
         allPsi.append((dsspList(dsspFile,id))[3])
         allPhi.append((dsspList(dsspFile,id))[2])
     return(allPhi,allPsi,allChi)
-'''
-def conformationPlot(fileName, fileDirectory,dsspFile): #This takes the results from psiPhiChi and plots them on a 3d axis
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    dataTuple = psiPhiChi(fileName, fileDirectory, dsspFile)
-    zdata = np.array(dataTuple[2])
-    ydata = np.array(dataTuple[1])
-    xdata = np.array(dataTuple[0])
-    ax.scatter3D(xdata,ydata,zdata,c=zdata,cmap='Greens')
-    plt.xlabel("Phi Angle")
-    plt.ylabel("Psi Angle")
-    ax.set_zlabel("Chi Angle")
-    ax.set_zlim(-180,180)
-    ax.set_xlim(-180, 180)
-    ax.set_ylim(-200, 200)
-    plt.show()
-'''
+
 def toNum (value): #turns an exponential into a decimal
     valWO = value.split('e')
     ret_val = format(((float(valWO[0]))*(10**int(valWO[1]))), '.8f')
     return ret_val
 
-
-'''
-def compatiblePositions(fileName,fileDirectory,dsspFile,dataFile):  #scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
-
-    def toNum (value): #turns an exponential into a decimal
-        valWO = value.split('e')
-        ret_val = format(((float(valWO[0]))*(10**int(valWO[1]))), '.8f')
-        return ret_val
-
-    def angleCutoff(conformationDataFile): #scans the database for acceptable conformations. The probability of a conformation has to be greater than 0.01
-        anglesCutoff = []
-        lines = []
-        with open(conformationDataFile) as file:
-            lines = file.readlines()
-            for line in lines:
-                line = line.split()
-                prob = float(line[2])
-                try:
-                    prob = float(toNum(str(prob)))
-                except IndexError:
-                    pass
-                if prob>0.01:
-                    anglesCutoff.append([float(line[0]),float(line[1])])
-        return anglesCutoff
-
-    angleList = angleCutoff(dataFile)
-    listCompatible = []
-    listVal = prolineDict(fileName, fileDirectory)
-    idList = idCreation(listVal[0])
-
-    for id in idList: #compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
-        phiPsi = []
-        tempList = dsspList(dsspFile,id)
-        phiPsi.extend([tempList[2],tempList[3]])
-        if phiPsi in angleList:
-            listCompatible.append(id)
-    return listCompatible
-'''
-
 class backboneCompatibility():
-    def __init__(self,contourPlot):
+    def __init__(self,contourPlot,cutoff):
         self.angleDict = {}
         self.anglesCutoff = []
         with open(contourPlot) as file:
@@ -195,14 +139,16 @@ class backboneCompatibility():
                     prob = float(toNum(str(prob)))
                 except IndexError:
                     pass
-                if prob > 0.01:
+                if prob > cutoff:
                     self.anglesCutoff.append([float(line[0]), float(line[1])])
 
     def returnProb(phiPsi,self):
         return self.angleDict[phiPsi]
 
 
-    def compatiblePositions(self,struct,dsspFile):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
+    def compatiblePositions(self,fileName,pdbFile,dsspFile):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
+        aminoList = ["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","LLE","ILE","LEU","LYS","MET","PHE","PRO","PYL","SER","SEC","THR","TRP","TYR","VAL"]
+        struct = parser.get_structure(fileName,pdbFile)
 
         angleList = self.anglesCutoff
         phiList = []
@@ -214,12 +160,13 @@ class backboneCompatibility():
 
         idList = []
         listCompatible = []
-        model = struct[0]
-
-        for chain in model:
-            for residue in chain:
-                addition = (chain.id,residue.id)
-                idList.append(addition)
+        #model = struct[0]
+        for model in struct:
+            for chain in model:
+                for residue in chain:
+                    if residue.get_resname() in aminoList:
+                        addition = (chain.id,residue.id)
+                        idList.append(addition)
 
         for id in idList:  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
             phiPsi = []
@@ -228,7 +175,6 @@ class backboneCompatibility():
             phi = round(tempList[2])
             psi = round(tempList[3])
 
-            #if phiPsi in angleList or [phiPsi[0]+1,phiPsi[1]] in angleList or[phiPsi[0],phiPsi[1]+1] in angleList or [phiPsi[0]+1,phiPsi[1]+1] in angleList or [phiPsi[0]-1,phiPsi[1]] in angleList or [phiPsi[0],phiPsi[1]-1] in angleList or [phiPsi[0]-1,phiPsi[1]-1] in angleList or [phiPsi[0]-1,phiPsi[1]+1] in angleList or [phiPsi[0]+1,phiPsi[1]-1] in angleList:
             phiRange = set([phi-1,phi,phi+1])
             psiRange = set([psi-1,psi,psi+1])
             psiSet = set(psiList)
@@ -299,12 +245,14 @@ class prolineConformation():
                 returnPsi = self.psiList[i]
         return [returnPhi,returnPsi]
 
-def mutateSite(structure,residueFullID):
+def mutateSite(pdbFile,targetResidueFullID, targName, referenceStructure, refName, modelNum, chainName, resNum, colNum, conNum): #reference structure file is the pdb file for the structure that you want to extract the proline that you are going to mutate onto the target structure.
 
+    structure = parser.get_structure(targName,pdbFile)
     newStructure = structure.copy()
     orgStruct = structure
-    chain = newStructure[residueFullID[1]][residueFullID[2]]
-    res = chain[residueFullID[3]]
+    print(targetResidueFullID)
+    chain = newStructure[targetResidueFullID[1]][targetResidueFullID[2]]
+    res = chain[targetResidueFullID[3]]
     count = 0
     for residue in chain:
         if residue != res:
@@ -314,17 +262,17 @@ def mutateSite(structure,residueFullID):
     resId = res.id
     replaceID = resId[1]
     chain.detach_child(resId)
-    libraryStructure = parser.get_structure("7dwy","test/7dwy.pdb")
-    replacePro = libraryStructure[0]["A"][809]
+    referenceStructure = parser.get_structure(refName,referenceStructure)
+    replacePro = referenceStructure[modelNum][chainName][resNum]
     replacePro.id = resId
     chain.insert(count,replacePro)
     io = PDBIO()
     io.set_structure(newStructure)
     io.save("structureFile.pdb")
-    replacementCost(orgStruct,newStructure,chain.id,resId,chain[resId],residueFullID[1])
-    return chain[resId]
+    costTuple = replacementCost(orgStruct,newStructure,chain.id,resId,chain[resId],targetResidueFullID[1],colNum,conNum)
+    return costTuple
 
-def distanceBetweenResidues(residue):
+def distanceBetweenResidues(residue,discol,discon):
     collisions = 0
     mainChainAtoms = ["C", "N", "O", "CA"]
     mutatedResidueSideChain = []
@@ -338,36 +286,58 @@ def distanceBetweenResidues(residue):
         if res != residue:
             distance = 0
             for atom in res:
-                if atom.get_name() not in mainChainAtoms:
-                    for mutateAtom in mutatedResidueSideChain:
-                        distance = abs(mutateAtom-atom)
-                        if abs(distance)<=4.5:
-                            contacts+=1
-                        if abs(distance)<=2.8:
-                            collisions+=1
+                for mutateAtom in mutatedResidueSideChain:
+                    distance = abs(mutateAtom-atom)
+                    if abs(distance)<=discon:
+                        contacts+=1
+                    if abs(distance)<=discol:
+                        collisions+=1
     return [collisions,contacts]
 
-def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, modelID):
+def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, modelID, distCollision, distContact):
     io = PDBIO()
     io.set_structure(newStructure)
-    io.save("structureFile.pdb")
-    modifiedStructureDSSP = pdb_to_dssp("structureFile.pdb","https://www3.cmbi.umcn.nl/xssp/")
-    file = open("structureFile.dssp", "w")
+    io.save("modifiedStructure.pdb")
+    modifiedStructureDSSP = pdb_to_dssp("modifiedStructure.pdb","https://www3.cmbi.umcn.nl/xssp/")
+    file = open("modifiedStructure.dssp", "w")
     file.write(modifiedStructureDSSP)
     file.close()
     id = (chainId, resId)
-    listVal = dsspListWORemove("structureFile.dssp",id)
-    print(listVal)
-    sr = ShrakeRupley()
-    sr.compute(mutatedResidue, level='R')
-    asa = mutatedResidue.sasa
-    n_collisions = distanceBetweenResidues(mutatedResidue)[0]
+    listVal = dsspListWORemove("modifiedStructure.dssp",id)
+
     resNum = resId[1]
-    n_contacts_wt = distanceBetweenResidues(orgStrcut[modelID][chainId][resNum])[1]
-    n_contacts_pro = distanceBetweenResidues(mutatedResidue)[1]
+    orgResidue = orgStrcut[modelID][chainId][resNum]
+    sr = ShrakeRupley()
+    sr.compute(orgResidue, level='R')
+    asa = orgResidue.sasa
+    n_collisions = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[0]
+
+    n_contacts_wt = distanceBetweenResidues(orgResidue, distCollision, distContact)[1]
+    n_contacts_pro = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[1]
+
     ACC = listVal[2]
     mutate_Cost = namedtuple("Mutate_Cost",['phi', 'psi', 'SASA', 'SSE', 'ACC', 'n_collisions', 'n_contacts_wt', 'n_contacts_pro'])
     costTuple = mutate_Cost(listVal[3], listVal[4], asa, listVal[1], ACC, n_collisions, n_contacts_wt, n_contacts_pro) #phi,psi,asa,sse...
-    print(costTuple)
+    return costTuple
+
     #os.remove("structureFile.dssp")
     #os.remove("structureFile.pdb")
+
+
+'''
+def conformationPlot(fileName, fileDirectory,dsspFile): #This takes the results from psiPhiChi and plots them on a 3d axis
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    dataTuple = psiPhiChi(fileName, fileDirectory, dsspFile)
+    zdata = np.array(dataTuple[2])
+    ydata = np.array(dataTuple[1])
+    xdata = np.array(dataTuple[0])
+    ax.scatter3D(xdata,ydata,zdata,c=zdata,cmap='Greens')
+    plt.xlabel("Phi Angle")
+    plt.ylabel("Psi Angle")
+    ax.set_zlabel("Chi Angle")
+    ax.set_zlim(-180,180)
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-200, 200)
+    plt.show()
+'''
