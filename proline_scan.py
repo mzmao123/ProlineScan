@@ -89,9 +89,9 @@ if __name__ == "__main__":
 
     targetList = args.targetLocation
     targetLocation = (targetList[0],int(targetList[1]),targetList[2],(' ',int(targetList[3]),' '))
-
+    print(compatiblePos)
+    ''' this is what will create a cost tuple for each compatible position
     costDict = {}
-    '''
     for id in compatiblePos:
         modelNum = id[0]
         chainName = id[1]
@@ -104,6 +104,7 @@ if __name__ == "__main__":
     f = open("totalCostDictionary.txt","w")
     f.write(costDict)
     f.close()
+    
     '''
     costTuple = mutateSite(pdbFile,targetLocation,pFileName,referenceStructure, name, refModelNum, refChainName, refResID,collisionDistance,contactDiscance)
     print(costTuple)

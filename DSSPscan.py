@@ -1,12 +1,14 @@
 from Bio.PDB import PDBParser, Superimposer, calc_dihedral
 from Bio.PDB.DSSP import make_dssp_dict
 from Bio.PDB.SASA import *
+
 import numpy as np
 import math
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import json
 import os
+
 from PDBtoDSSP import pdb_to_dssp
 from Bio.PDB.PDBIO import PDBIO
 from collections import namedtuple
@@ -254,7 +256,6 @@ def mutateSite(pdbFile,targetResidueFullID, targName, referenceStructure, refNam
     structure = parser.get_structure(targName,pdbFile)
     newStructure = structure.copy()
     orgStruct = structure
-    print(targetResidueFullID)
     chain = newStructure[targetResidueFullID[1]][targetResidueFullID[2]]
     res = chain[targetResidueFullID[3]]
     count = 0
@@ -267,9 +268,8 @@ def mutateSite(pdbFile,targetResidueFullID, targName, referenceStructure, refNam
     chain.detach_child(resId)
     referenceStructure = parser.get_structure(refName,referenceStructure)
     replacePro = referenceStructure[modelNum][chainName][resNum]
-    replacePro.id = targetResidueFullID[3]
+    replacePro._id=resId
     chain.insert(count,replacePro)
-    print(res.id)
     io = PDBIO()
     io.set_structure(newStructure)
     io.save("structureFile.pdb")
