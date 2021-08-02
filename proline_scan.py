@@ -90,6 +90,21 @@ if __name__ == "__main__":
     targetList = args.targetLocation
     targetLocation = (targetList[0],int(targetList[1]),targetList[2],(' ',int(targetList[3]),' '))
 
+    costDict = {}
+    '''
+    for id in compatiblePos:
+        modelNum = id[0]
+        chainName = id[1]
+        resID = id[2]
+        targLoc = (pFileName,modelNum,chainName,resID)
+        print(id)
+        print(targLoc)
+        costDict[id] = mutateSite(pdbFile,targLoc,pFileName,referenceStructure,name,refModelNum,refChainName,refResID,collisionDistance,contactDiscance)
+        print(costDict[id])
+    f = open("totalCostDictionary.txt","w")
+    f.write(costDict)
+    f.close()
+    '''
     costTuple = mutateSite(pdbFile,targetLocation,pFileName,referenceStructure, name, refModelNum, refChainName, refResID,collisionDistance,contactDiscance)
     print(costTuple)
 

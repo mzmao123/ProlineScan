@@ -159,6 +159,7 @@ class backboneCompatibility():
             psiList.append(lis[1])
 
         idList = []
+        idListWithModelNum = []
         listCompatible = []
         #model = struct[0]
         for model in struct:
@@ -166,15 +167,18 @@ class backboneCompatibility():
                 for residue in chain:
                     if residue.get_resname() in aminoList:
                         addition = (chain.id,residue.id)
+                        secondAddition = (model.id,chain.id,residue.id)
                         idList.append(addition)
+                        idListWithModelNum.append(secondAddition)
 
-        for id in idList:  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
+        for i in range(len(idList)):  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
             phiPsi = []
+            id = idList[i]
             tempList = dsspList(dsspFile, id)
+            secondID = idListWithModelNum[i]
             phiPsi.extend([round(tempList[2]), round(tempList[3])])
             phi = round(tempList[2])
             psi = round(tempList[3])
-
             phiRange = set([phi-1,phi,phi+1])
             psiRange = set([psi-1,psi,psi+1])
             psiSet = set(psiList)
@@ -185,8 +189,8 @@ class backboneCompatibility():
             for val in phiIntersectVal:
                 for val2 in psiIntersectVal:
                     if [val,val2] in angleList:
-                        if id not in listCompatible:
-                            listCompatible.append(id)
+                        if secondID not in listCompatible:
+                            listCompatible.append(secondID)
                         else:
                             pass
                         break
@@ -260,12 +264,12 @@ def mutateSite(pdbFile,targetResidueFullID, targName, referenceStructure, refNam
         else:
             break
     resId = res.id
-    replaceID = resId[1]
     chain.detach_child(resId)
     referenceStructure = parser.get_structure(refName,referenceStructure)
     replacePro = referenceStructure[modelNum][chainName][resNum]
-    replacePro.id = resId
+    replacePro.id = targetResidueFullID[3]
     chain.insert(count,replacePro)
+    print(res.id)
     io = PDBIO()
     io.set_structure(newStructure)
     io.save("structureFile.pdb")
