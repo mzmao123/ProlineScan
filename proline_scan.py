@@ -5,6 +5,7 @@ import argparse
 from PDBtoDSSP import pdb_to_dssp
 from DSSPscan import backboneCompatibility as BC
 from DSSPscan import mutateSite, mutateSiteWhole
+import json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -77,9 +78,9 @@ if __name__ == "__main__":
         resultBC = BC(countourPlot, cutoff)
         compatiblePos = BC.compatiblePositions(resultBC, structName, pdbFile, "targetStructure.dssp")
         costDict = mutateSiteWhole(pdbFile, structName, referenceStructure, name, refModelNum, refChainName,refResID, collisionDistance, contactDiscance, compatiblePos)
-        f = open("totalCostDictionary.txt","w")
-        f.write(costDict)
-        f.close()
+        print(costDict)
+        #with open("totalCostDictionary.txt","w") as file:
+        #    file.write(json.dumps(costDict))
 
 #python proline_scan.py test/7dwyTestMutateSite.pdb -t "7dwy" 0 "A" 809
 #python proline_scan.py test/7dwyTestMutateSite.pdb -n "7dwyTestMutateSite"

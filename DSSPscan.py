@@ -353,7 +353,6 @@ def mutateSiteWhole(pdbFile, structName, referenceStructure, refName, modelNum, 
     structure = parser.get_structure(structName,pdbFile)
     referenceStructure = parser.get_structure(refName, referenceStructure)
     replaceProMaster = referenceStructure[modelNum][chainName][resNum]
-    print(replaceProMaster.id)
 
     newStructure = structure.copy()
     orgStruct = structure
