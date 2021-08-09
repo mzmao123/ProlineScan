@@ -4,33 +4,8 @@ import sys
 import argparse
 from PDBtoDSSP import pdb_to_dssp
 from DSSPscan import backboneCompatibility as BC
-from DSSPscan import mutateSite
+from DSSPscan import mutateSite, mutateSiteWhole
 
-'''
-def parse():
-    parser = argparse.ArgumentParser(description="Check proline compatbible positions in a given structure and the potential cost of mutate them to proline") 
-    parser.add_argument('pdbfile', help='Input structure (in pdb format)')
-    parser.add_argument('--prob_cutoff', help='Probability cutoff for the compatible mainchain phi-psi angles (default: 0.01)', default=0.01, type=float)
-    parser.add_argument('--dist_collision', help='XXX', default=2.8, type=float)
-    parser.add_argument('--dist_contact_0', help='XXX', default=3.0, type=float)
-    parser.add_argument('--dist_contact_1', help='XXX', default=4.5, type=float)
-    parser.add_argument('--sse_window', help='XXX', default=3, type=int)
-    parser.add_argument('output', help='Output file name')
-    return parser.parse_args()
-
-def main():
-    para = parse()
-    #
-    print('#%s' %(' '.join(sys.argv)))
-    #
-    print(para.pdbfile)
-    print(para.prob_cutoff)
-    print(para.dist_collision)
-    print(para.dist_contact_1)
-    print(para.dist_contact_0)
-    print(para.sse_window)
-    print(para.output)
-'''
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description = "Check proline compatible positions in a given strucuture and return the potential cost of mutating a site to a proline"
@@ -38,9 +13,11 @@ if __name__ == "__main__":
     parser.add_argument('pdbfile',
                         help = 'Input the structure in a pdb file format')
 
-    parser.add_argument('-t','--targetLocation', nargs = "+", required = True,
-                        help = "list the values with spaces in between containing name, modelnum, chain name and residuenum eg. '7dwy' 0 'A' 809",
+    parser.add_argument('-t','--targetLocation', nargs = "+",
+                        help = "list the values with spaces in between containing name, modelnum, chain name and residuenum eg. '7dwy' 0 'A' 809", default = "N"
                         )
+    parser.add_argument('-n','--structureName',
+                        help = "if you are inputing the whole structure and not just a target location, enter the PDB ID of the structure eg. '7dwy' ")
     parser.add_argument('-r','--referenceStruct',
                         help = 'Input the pdb file for the structure from which the proline will come from, default will be the 7dwy.pdb structure',
                         default = 'test/7dwy.pdb')
@@ -61,11 +38,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     pdbFile = args.pdbfile
+
     fullID = args.targetLocation
-    pFileName = fullID[0]
-    targModelNum = int(fullID[1])
-    targetChainName = fullID[2]
-    targetResID = int(fullID[3])
 
     referenceStructure = args.referenceStruct
     refModelNum = args.refPosTup[1]
@@ -78,35 +52,34 @@ if __name__ == "__main__":
     contactDiscance = args.dist_contact
     collisionDistance = args.dist_collision
 
-    dsspFile = pdb_to_dssp(pdbFile,"https://www3.cmbi.umcn.nl/xssp/")
+    dsspFile = pdb_to_dssp(pdbFile, "https://www3.cmbi.umcn.nl/xssp/")
     file = open("targetStructure.dssp", "w")
     file.write(dsspFile)
     file.close()
 
+    if fullID != "N":
+        pFileName = fullID[0]
+        targModelNum = int(fullID[1])
+        targetChainName = fullID[2]
+        targetResID = int(fullID[3])
+        targetLocation = (fullID[0], int(fullID[1]), fullID[2], (' ', int(fullID[3]), ' '))
 
-    resultBC = BC(countourPlot,cutoff)
-    compatiblePos = BC.compatiblePositions(resultBC,pFileName,pdbFile,"targetStructure.dssp")
+        resultBC = BC(countourPlot,cutoff)
+        compatiblePos = BC.compatiblePositions(resultBC,pFileName,pdbFile,"targetStructure.dssp")
+        ID = (targModelNum,targetChainName, targetResID)
+        if ID not in compatiblePos:
+            print("WARNING: This residue is likely not compatible with a proline")
+        costTuple = mutateSite(pdbFile, targetLocation, pFileName, referenceStructure, name, refModelNum, refChainName,refResID, collisionDistance, contactDiscance)
+        print(costTuple)
 
-    targetList = args.targetLocation
-    targetLocation = (targetList[0],int(targetList[1]),targetList[2],(' ',int(targetList[3]),' '))
-    print(compatiblePos)
-    ''' this is what will create a cost tuple for each compatible position
-    costDict = {}
-    for id in compatiblePos:
-        modelNum = id[0]
-        chainName = id[1]
-        resID = id[2]
-        targLoc = (pFileName,modelNum,chainName,resID)
-        print(id)
-        print(targLoc)
-        costDict[id] = mutateSite(pdbFile,targLoc,pFileName,referenceStructure,name,refModelNum,refChainName,refResID,collisionDistance,contactDiscance)
-        print(costDict[id])
-    f = open("totalCostDictionary.txt","w")
-    f.write(costDict)
-    f.close()
-    
-    '''
-    costTuple = mutateSite(pdbFile,targetLocation,pFileName,referenceStructure, name, refModelNum, refChainName, refResID,collisionDistance,contactDiscance)
-    print(costTuple)
+    if fullID == "N":
+        structName = args.structureName
+        resultBC = BC(countourPlot, cutoff)
+        compatiblePos = BC.compatiblePositions(resultBC, structName, pdbFile, "targetStructure.dssp")
+        costDict = mutateSiteWhole(pdbFile, structName, referenceStructure, name, refModelNum, refChainName,refResID, collisionDistance, contactDiscance, compatiblePos)
+        f = open("totalCostDictionary.txt","w")
+        f.write(costDict)
+        f.close()
 
 #python proline_scan.py test/7dwyTestMutateSite.pdb -t "7dwy" 0 "A" 809
+#python proline_scan.py test/7dwyTestMutateSite.pdb -n "7dwyTestMutateSite"

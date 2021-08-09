@@ -239,7 +239,7 @@ class prolineConformation():
     def similarPair(phiPsi,self):
         phi = phiPsi[0]
         psi = phiPsi[1]
-        diff = 10000
+        diff = 1
         returnPhi = 0
         returnPsi = 0
 
@@ -307,41 +307,130 @@ def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, mode
     file.write(modifiedStructureDSSP)
     file.close()
     id = (chainId, resId)
+    res2ID = (resId[0],resId[1]+1,resId[2])
+    res3ID = (resId[0],resId[1]-1,resId[2])
+
     listVal = dsspListWORemove("modifiedStructure.dssp",id)
+    try:
+        listVal2 = dsspListWORemove("modifiedStructure.dssp",res2ID)
+    except:
+        listVal2 = listVal
+    try:
+        listVal3 = dsspListWORemove("modieifiedStructure.dssp",res3ID)
+    except:
+        listVal3 = listVal
+    SSE1 = listVal2[1]
+    SSE2 = listVal3[1]
+    SSE = ""
+    if SSE1 == "-":
+        SSE = SSE2
+    else:
+        SSE = SSE1
 
     resNum = resId[1]
     orgResidue = orgStrcut[modelID][chainId][resNum]
     sr = ShrakeRupley()
     sr.compute(orgResidue, level='R')
     asa = orgResidue.sasa
+
     n_collisions = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[0]
 
     n_contacts_wt = distanceBetweenResidues(orgResidue, distCollision, distContact)[1]
     n_contacts_pro = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[1]
 
     ACC = listVal[2]
+
+
     mutate_Cost = namedtuple("Mutate_Cost",['phi', 'psi', 'SASA', 'SSE', 'ACC', 'n_collisions', 'n_contacts_wt', 'n_contacts_pro'])
-    costTuple = mutate_Cost(listVal[3], listVal[4], asa, listVal[1], ACC, n_collisions, n_contacts_wt, n_contacts_pro) #phi,psi,asa,sse...
+    costTuple = mutate_Cost(listVal[3], listVal[4], asa, SSE, ACC, n_collisions, n_contacts_wt, n_contacts_pro) #phi,psi,asa,sse...
     return costTuple
 
     #os.remove("structureFile.dssp")
     #os.remove("structureFile.pdb")
 
+def mutateSiteWhole(pdbFile, structName, referenceStructure, refName, modelNum, chainName, resNum, colNum, conNum, compatible): #reference structure file is the pdb file for the structure that you want to extract the proline that you are going to mutate onto the target structure.
 
-'''
-def conformationPlot(fileName, fileDirectory,dsspFile): #This takes the results from psiPhiChi and plots them on a 3d axis
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    dataTuple = psiPhiChi(fileName, fileDirectory, dsspFile)
-    zdata = np.array(dataTuple[2])
-    ydata = np.array(dataTuple[1])
-    xdata = np.array(dataTuple[0])
-    ax.scatter3D(xdata,ydata,zdata,c=zdata,cmap='Greens')
-    plt.xlabel("Phi Angle")
-    plt.ylabel("Psi Angle")
-    ax.set_zlabel("Chi Angle")
-    ax.set_zlim(-180,180)
-    ax.set_xlim(-180, 180)
-    ax.set_ylim(-200, 200)
-    plt.show()
-'''
+    structure = parser.get_structure(structName,pdbFile)
+    referenceStructure = parser.get_structure(refName, referenceStructure)
+    replaceProMaster = referenceStructure[modelNum][chainName][resNum]
+    print(replaceProMaster.id)
+
+    newStructure = structure.copy()
+    orgStruct = structure
+
+
+    for id in compatible:
+        replacepro = replaceProMaster.copy()
+        chain = newStructure[id[0]][id[1]]
+        res = chain[id[2]]
+        count = 0
+        for residue in chain:
+            if residue != res:
+                count+=1
+            else:
+                break
+        resId = res.id
+        chain.detach_child(resId)
+
+        replacepro._id=resId
+
+        chain.insert(count,replacepro)
+
+        residue = chain[resId]
+    io = PDBIO()
+    io.set_structure(newStructure)
+    io.save("structureFile.pdb")
+    costDict = replacementCostDict(orgStruct,newStructure,colNum,conNum, compatible)
+    return costDict
+
+def replacementCostDict(orgStrcut,newStructure, distCollision, distContact, compatible):
+    costDict = {}
+    io = PDBIO()
+    io.set_structure(newStructure)
+    io.save("modifiedStructure.pdb")
+    modifiedStructureDSSP = pdb_to_dssp("modifiedStructure.pdb", "https://www3.cmbi.umcn.nl/xssp/")
+    file = open("modifiedStructure.dssp", "w")
+    file.write(modifiedStructureDSSP)
+    file.close()
+    for pos in compatible:
+        modelID = pos[0]
+        chainId = pos[1]
+        resId = pos[2]
+        mutatedResidue = newStructure[modelID][chainId][resId]
+        id = (pos[1],resId)
+        res2ID = (resId[0], resId[1] + 1, resId[2])
+        res3ID = (resId[0], resId[1] - 1, resId[2])
+
+        listVal = dsspListWORemove("modifiedStructure.dssp", id)
+        try:
+            listVal2 = dsspListWORemove("modifiedStructure.dssp", res2ID)
+        except:
+            listVal2 = listVal
+        try:
+            listVal3 = dsspListWORemove("modieifiedStructure.dssp", res3ID)
+        except:
+            listVal3 = listVal
+        SSE1 = listVal2[1]
+        SSE2 = listVal3[1]
+        SSE = ""
+        if SSE1 == "-":
+            SSE = SSE2
+        else:
+            SSE = SSE1
+
+        resNum = resId[1]
+        orgResidue = orgStrcut[modelID][chainId][resNum]
+        sr = ShrakeRupley()
+        sr.compute(orgResidue, level='R')
+        asa = orgResidue.sasa
+        n_collisions = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[0]
+
+        n_contacts_wt = distanceBetweenResidues(orgResidue, distCollision, distContact)[1]
+        n_contacts_pro = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[1]
+
+        ACC = listVal[2]
+
+        mutate_Cost = namedtuple("Mutate_Cost", ['phi', 'psi', 'SASA', 'SSE', 'ACC', 'n_collisions', 'n_contacts_wt','n_contacts_pro'])
+        costTuple = mutate_Cost(listVal[3], listVal[4], asa, SSE, ACC, n_collisions, n_contacts_wt,n_contacts_pro)  # phi,psi,asa,sse...
+        costDict[pos] = costTuple
+    return costDict
