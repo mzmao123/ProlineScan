@@ -1,6 +1,5 @@
 from Bio.PDB import PDBParser, Superimposer, calc_dihedral
 from Bio.PDB.DSSP import make_dssp_dict
-from Bio.PDB.SASA import *
 
 import numpy as np
 import math
@@ -119,7 +118,7 @@ def toNum (value): #turns an exponential into a decimal
     return ret_val
 
 class backboneCompatibility():
-    def __init__(self,contourPlot,cutoff):
+    def __init__(self,contourPlot):
         self.angleDict = {}
         self.anglesCutoff = []
         with open(contourPlot) as file:
@@ -131,76 +130,62 @@ class backboneCompatibility():
                     prob = float(toNum(str(prob)))
                 except IndexError:
                     pass
-                angVal = (float(line[0]),float(line[1]))
+                angVal = (int(line[0]),int(line[1]))
                 self.angleDict[angVal] = prob
-    # scans the database for acceptable conformations. The probability of a conformation has to be greater than 0.01
-            for line in self.lines:
-                line = line.split()
-                prob = float(line[2])
-                try:
-                    prob = float(toNum(str(prob)))
-                except IndexError:
-                    pass
-                if prob > cutoff:
-                    self.anglesCutoff.append([float(line[0]), float(line[1])])
 
-    def returnProb(phiPsi,self):
-        return self.angleDict[phiPsi]
+    def returnProb(self, phiPsi):
+        phi = round(phiPsi[0])
+        psi = round(phiPsi[1])
+        nb_pairs = []
+        for i in (0, -1, 1):
+            for j in (0, -1, 1):
+                phi_nb = phi + i
+                psi_nb = psi + j
+                nb_pairs.append((phi_nb, psi_nb))
+        probability = 0.0
+        for phi_psi_pair in nb_pairs:
+            if phi_psi_pair in self.angleDict:
+                probability = self.angleDict[phi_psi_pair]
+                break
+        return probability
 
-
-    def compatiblePositions(self,fileName,pdbFile,dsspFile):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
-        aminoList = ["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","LLE","ILE","LEU","LYS","MET","PHE","PRO","PYL","SER","SEC","THR","TRP","TYR","VAL"]
-        struct = parser.get_structure(fileName,pdbFile)
-
-        angleList = self.anglesCutoff
-        phiList = []
-        psiList = []
-
-        for lis in angleList:
-            phiList.append(lis[0])
-            psiList.append(lis[1])
-
-        idList = []
-        idListWithModelNum = []
-        listCompatible = []
-        #model = struct[0]
-        for model in struct:
-            for chain in model:
-                for residue in chain:
-                    if residue.get_resname() in aminoList:
-                        addition = (chain.id,residue.id)
-                        secondAddition = (model.id,chain.id,residue.id)
-                        idList.append(addition)
-                        idListWithModelNum.append(secondAddition)
-
-        for i in range(len(idList)):  # compares the phi and psi angles for all the prolines and compares it with the list of acceptable phi and psi conformations.
-            phiPsi = []
-            id = idList[i]
-            tempList = dsspList(dsspFile, id)
-            secondID = idListWithModelNum[i]
-            phiPsi.extend([round(tempList[2]), round(tempList[3])])
-            phi = round(tempList[2])
-            psi = round(tempList[3])
-            phiRange = set([phi-1,phi,phi+1])
-            psiRange = set([psi-1,psi,psi+1])
-            psiSet = set(psiList)
-            phiSet = set(phiList)
-            phiIntersectVal = phiSet.intersection(phiRange)
-            psiIntersectVal = psiSet.intersection(psiRange)
-
-            for val in phiIntersectVal:
-                for val2 in psiIntersectVal:
-                    if [val,val2] in angleList:
-                        if secondID not in listCompatible:
-                            listCompatible.append(secondID)
-                        else:
-                            pass
-                        break
+    def compatiblePositions(self, chain, dssp_dict, prob_cutoff=0.01):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
+        amino_acids = set("ALA ARG ASN ASP CYS GLN GLU GLY HIS LLE ILE LEU LYS MET PHE PRO PYL SER SEC THR TRP TYR VAL".split())
+        listCompatible  = []
+        for res in chain.get_residues():
+            if res.name not in amino_acids: continue
+            aa, sse, asa, phi, psi = dssp_dict[(chain.id, res.id)]
+            probability = self.returnProb(phi, psi)
+            if probability > prob_cutoff:
+                listCompatible.append((resid, (sse, asa, phi, psi, probability)))
         return listCompatible
 
     def conformationPlot(fileName, fileDirectory,dsspFile):  # This takes the results from psiPhiChi and plots them on a 3d axis
         dataTuple = psiPhiChi(fileName, fileDirectory, dsspFile)
         return dataTuple
+
+class RepresentiveProlines:
+    def __init__(self, filelist):
+        self.prolines = {}
+        for fn in filelist:
+            p, phi, psi = fn.split('.')[0].split('_')
+            phi = int(phi)
+            psi = int(psi)
+            proline = parser.get_structure('', fn).get_residues()[0]
+            if (phi, psi) in self.prolines:
+                self.prolines[(phi, psi)].append(proline)
+            else:
+                self.prolines[(phi, psi)] = [proline]
+
+    def get(self, phi, psi):
+        dist = 1.0E9
+        best_match_phi_psi = (0.0, 0.0)
+        for rep_phi, rep_psi in self.prolines:
+            rep_dist = abs(phi-rep_phi)+ abs(psi-rep_psi)
+            if rep_dist < dist:
+                best_match_phi_psi = (rep_phi, rep_psi)
+                dist = rep_dist
+        return self.prolines[best_match_phi_psi]
 
 class prolineConformation():
     def __init__(self, fileName, dsspFile, fileDirectory):
@@ -250,6 +235,89 @@ class prolineConformation():
                 returnPhi = self.phiList[i]
                 returnPsi = self.psiList[i]
         return [returnPhi,returnPsi]
+
+def sidechain_compatibility(model, chain_id, res_id, dssp_dict, rep_prolines, collision_th, contact_dmin, contact_dmax):
+    aa, sse, asa, phi, psi = dssp_dict[(chain_id, res_id)]
+    # number of contacts in WT
+    n_contacts_wt = cnt_sidechain_contacts(model, chain_id, res_id, dist_range=(contact_dmin, contact_dmax))
+    #
+    closest_prolines = rep_prolines.get((phi, psi))
+    min_n_collision = 1000
+    for pro in closest_prolines:
+        working_model = model.copy()
+        # backbone superimposition
+        fixed_res = working_model[chain_id][res_id]
+        moving_res = pro.copy()
+        rms = backboneSuperimpose(fixed_res, moving_res)
+        # replace the residue
+        working_model[chain_id].detach_child(res_id)
+        moving_res.id = res_id
+        working_model[chain_id].add(moving_res)
+        # collision, contacts afer the replacement
+        n_collision = cnt_sidechain_contacts(working_model, chain_id, res_id, dist_range=(0,collision_th))
+        if n_collision < min_n_collision:
+            min_n_collision = n_collision
+            n_contacts_pro = cnt_sidechain_contacts(working_model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
+    return (n_collision, n_contacts_wt, n_contacts_pro)
+
+def cnt_sidechain_contacts(model, chain_id, res_id, dist_range):
+    # get the atoms of interest
+    main_chain_atoms = set('C N O CA'.split())
+    res = model[chain_id][res_id]
+    sc_atoms = [atom for atom in res if atom.name not in main_chain_atoms]
+    other_atoms = [atom for atom in model.get_atoms() if atom.parent != res]
+    # count number of atoms in the distance range
+    squared_dmin = dist_range[0]*dist_range[0]
+    squared_dmax = dist_range[1]*dist_range[1]
+    sqdist_mat = get_sqdist_mat(other_atoms, sc_atoms)
+    sqdist_min = numpy.min(sqdist_mat, axis=1)
+    result = [(atom, min_dist) for atom, min_dist in zip(other_atoms, sqdist_min) if min_dist > squared_dmin and min_dist < squared_dmax]
+    return len(result)
+
+def get_sqdist_mat(atoms_a, atoms_b):
+    coordsa = np.array([atom.coord for atom in atoms_a])
+    coordsb = np.array([atom.coord for atom in atoms_b])
+    return sqdist(coordsa, coordsb)
+
+def sqdist(xyza, xyzb):
+    ''' Get the distance matrix between coords array xyza and xyzb.
+
+    Input: 
+        xyza: [[xa1, ya1, za1], [xa2, ya2, za2], ...]
+        xyzb: [[xb1, yb1, zb1], [xb2, yb2, zb2], ...]
+
+    Output:
+        distmatrix: (an x bn)
+        [[D_a1_b1, D_a1_b2, D_a1_b3, ..., D_a1_bn], 
+         [D_a2_b1, D_a2_b2, D_a2_b3, ..., D_a2_bn], 
+         .
+         .
+         .
+         [D_an_b1, D_an_b2, D_an_b3, ..., D_an_bn], 
+    '''
+    sizea = xyza.shape[0]
+    sizeb = xyzb.shape[0]
+    mat_a = xyza.reshape(sizea, 1, 3)
+    mat_a = mat_a.repeat(sizeb, axis=1)
+    # mat_a:
+    # [[[xa1, ya1, za1], [[xa1, ya1, za1], ...],
+    #  [[xa2, ya2, za2], [[xa2, ya2, za2], ...], 
+    #  .
+    #  .
+    #  .
+    #  [[xan, yan, zan], [[xan, yan, zan], ...]]
+    mat_b = xyzb.reshape(1, sizeb, 3)
+    mat_b = mat_b.repeat(sizea, axis=0)
+    # mat_b:
+    # [[[xb1, yb1, zb1], [xb2, yb2, zb2], ...],
+    #  [[xb1, yb1, zb1], [xb2, yb2, zb2], ...],
+    #  .
+    #  .
+    #  .
+    #  [[xb1, yb1, zb1], [xb2, yb2, zb2], ...]]
+    dist = mat_a - mat_b
+    dist = numpy.sum(dist * dist, axis=2)
+    return dist
 
 def mutateSite(pdbFile,targetResidueFullID, targName, referenceStructure, refName, modelNum, chainName, resNum, colNum, conNum): #reference structure file is the pdb file for the structure that you want to extract the proline that you are going to mutate onto the target structure.
 
@@ -329,9 +397,6 @@ def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, mode
 
     resNum = resId[1]
     orgResidue = orgStrcut[modelID][chainId][resNum]
-    sr = ShrakeRupley()
-    sr.compute(orgResidue, level='R')
-    asa = orgResidue.sasa
 
     n_collisions = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[0]
 
@@ -339,6 +404,7 @@ def replacementCost(orgStrcut,newStructure, chainId, resId, mutatedResidue, mode
     n_contacts_pro = distanceBetweenResidues(mutatedResidue, distCollision, distContact)[1]
 
     ACC = listVal[2]
+    asa = ACC
 
 
     mutate_Cost = namedtuple("Mutate_Cost",['phi', 'psi', 'SASA', 'SSE', 'ACC', 'n_collisions', 'n_contacts_wt', 'n_contacts_pro'])
