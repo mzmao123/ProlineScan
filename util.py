@@ -28,7 +28,7 @@ def backboneSuperimpose(residue1, residue2): #Fucntion will superimpose two give
 BCInfo = namedtuple('BCInfo','resid sse asa phi psi prob'.split())
 amino_acids = set("ALA ARG ASN ASP CYS GLN GLU GLY HIS LLE ILE LEU LYS MET PHE PRO PYL SER SEC THR TRP TYR VAL".split())
 
-class BackboneCompatibility():
+class BackboneCompatibility:
     def __init__(self, rama8000_fn, comment='#'):
         self.rama8000 = {}
         with open(rama8000_fn) as infile:
@@ -112,12 +112,6 @@ def mutate_to_proline(model, chain_id, res_id, dssp_dict, rep_prolines, collisio
             mutated_model = working_model
     return (mutated_model, min_collisions)
 
-def count_to_res(res):
-    for i, r in enumerate(res.parent):
-        if r == res:
-            break
-    return i
-
 def sidechain_contacted_atoms(model, chain_id, res_id, dist_range):
     dmin, dmax = dist_range
     main_chain_atoms = set('C N O CA'.split())
@@ -145,6 +139,13 @@ def sidechain_contacted_atoms(model, chain_id, res_id, dist_range):
     else:  # GLY has no side chain atoms
         result = []
     return result
+
+# auxiliary functions
+def count_to_res(res):
+    for i, r in enumerate(res.parent):
+        if r == res:
+            break
+    return i
 
 def get_sqdist_mat(atoms_a, atoms_b):
     coordsa = np.array([atom.coord for atom in atoms_a])

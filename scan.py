@@ -10,6 +10,8 @@ import util
 
 from Bio.PDB import PDBParser
 
+path_to_this_script = os.path.dirname(os.path.abspath(__file__))
+
 def parse():
     parser = argparse.ArgumentParser(description="Check proline compatbible positions in a given structure and the potential cost of mutate them to proline") 
     parser.add_argument('pdbfile', help='Input structure (in pdb format)')
@@ -48,11 +50,12 @@ def main():
 
     # Scanning
     proline_conformations = './data/P_-58_37.1.pdb ./data/P_-58_37.2.pdb ./data/P_-60_140.1.pdb ./data/P_-60_140.2.pdb'.split()
+    proline_conformations = [path_to_this_script + '/' + fn for fn in proline_conformations]
     rep_prolines = util.RepresentiveProlines(proline_conformations)
     for chain_id in para.chains:
         chain = model[chain_id]
         # Backbone compatibility
-        proline_bc = util.BackboneCompatibility('data/rama8000-transpro.data')
+        proline_bc = util.BackboneCompatibility(path_to_this_script + '/' + './data/rama8000-transpro.data')
         bbcompatible_sites = proline_bc.compatible_sites(chain, dssp_dict, prob_cutoff)
         # Sidechain compatibility
         for res_id, sse, asa, phi, psi, prob in bbcompatible_sites:
