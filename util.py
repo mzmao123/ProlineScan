@@ -9,6 +9,12 @@ from Bio.PDB.PDBIO import PDBIO
 from collections import namedtuple
 parser = PDBParser(PERMISSIVE=1, QUIET=True)
 
+AA3to1 = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
+          'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
+          'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
+          'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y',
+          'MSE': 'M', 'UNK': 'X'}
+
 def backboneSuperimpose(residue1, residue2): #Fucntion will superimpose two given residues
     sup = Superimposer()
     targetResidue = residue1 #the residue that will not move
@@ -46,7 +52,7 @@ class BackboneCompatibility():
                 break
         return probability
 
-    def compatible_sites(self, chain, dssp_dict, prob_cutoff=0.01):  # scans all the prolines in the protein and compares it to a list of comformations from a database and returns the ids of the prolines that match the acceptable conformations
+    def compatible_sites(self, chain, dssp_dict, prob_cutoff=0.01):  # scans all sides in the given chain 
         sites = []
         for res in chain.get_residues():
             if res.resname not in amino_acids: continue
@@ -82,11 +88,12 @@ class RepresentiveProlines:
 
 def mutate_to_proline(model, chain_id, res_id, dssp_dict, rep_prolines, collision_th):
     aa, sse, asa, phi, psi = dssp_dict[(chain_id, res_id)][:5]
-    closest_prolines = rep_prolines.get(phi, psi)
+    closest_prolines = rep_prolines.get(phi, psi)  # Two of proline of different side chain conformations returned,  
     min_n_collision = 100
     min_collisions = None
     mutated_model = None
     for pro in closest_prolines:
+        # Try both conformation, keep the one introduce minimum number of collisions
         working_model = model.copy()
         # backbone superimposition
         fixed_res = working_model[chain_id][res_id]
@@ -112,26 +119,28 @@ def count_to_res(res):
     return i
 
 def sidechain_contacted_atoms(model, chain_id, res_id, dist_range):
-    # get the atoms of interest
     dmin, dmax = dist_range
     main_chain_atoms = set('C N O CA'.split())
     res = model[chain_id][res_id]
     if res.resname != 'GLY':
+        # get the atoms of interest 1: side chain atoms of selected residue
         sc_atoms = [atom for atom in res if atom.name not in main_chain_atoms]
         i = count_to_res(res)
         res_minus = res.parent.child_list[i-1]
+        # get the atoms of interest 2: atoms on other resiudes
         other_atoms = []
         for atom in model.get_atoms():
             if (atom.parent == res_minus and atom.name in ['C', 'CA']) or atom.parent == res:
-                # skip C/CA at i-1 (distance is legally < 2.8A) and self
+                # skip C/CA at i-1 (distance to proline_i is legally < 2.8A) and self
                 continue
             else:
                 other_atoms.append(atom)
-        # count number of atoms in the distance range
+        # select other_atoms within the distance range of sc_atoms
         squared_dmin = dmin * dmin
         squared_dmax = dmax * dmax
         sqdist_mat = get_sqdist_mat(other_atoms, sc_atoms)
         sqdist_min = np.min(sqdist_mat, axis=1)
+        # select by the minimum distance for each other_atoms to sc_atoms
         result = [(atom, min_dist) for atom, min_dist in zip(other_atoms, sqdist_min) if min_dist > squared_dmin and min_dist < squared_dmax]
     else:  # GLY has no side chain atoms
         result = []

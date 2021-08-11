@@ -10,12 +10,6 @@ import util
 
 from Bio.PDB import PDBParser
 
-AA3to1 = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-          'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-          'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-          'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y',
-          'MSE': 'M', 'UNK': 'X'}
-
 def parse():
     parser = argparse.ArgumentParser(description="Check proline compatbible positions in a given structure and the potential cost of mutate them to proline") 
     parser.add_argument('pdbfile', help='Input structure (in pdb format)')
@@ -53,24 +47,25 @@ def main():
     dssp_dict = make_dssp_dict(dssp_file)[0]
 
     # Scanning
+    proline_conformations = './data/P_-58_37.1.pdb ./data/P_-58_37.2.pdb ./data/P_-60_140.1.pdb ./data/P_-60_140.2.pdb'.split()
+    rep_prolines = util.RepresentiveProlines(proline_conformations)
     for chain_id in para.chains:
         chain = model[chain_id]
         # Backbone compatibility
         proline_bc = util.BackboneCompatibility('data/rama8000-transpro.data')
         bbcompatible_sites = proline_bc.compatible_sites(chain, dssp_dict, prob_cutoff)
         # Sidechain compatibility
-        proline_conformations = './data/P_-58_37.1.pdb ./data/P_-58_37.2.pdb ./data/P_-60_140.1.pdb ./data/P_-60_140.2.pdb'.split()
-        rep_prolines = util.RepresentiveProlines(proline_conformations)
         for res_id, sse, asa, phi, psi, prob in bbcompatible_sites:
             res = model[chain_id][res_id]
-            #if res.resname == 'PRO':  # skip side chain compatibility check for prolines
-            #    continue
+            if res.resname == 'PRO':  # skip if it is already proline
+                continue
+            # collecting the side chain compatibility information (contacts, collisions, etc)
             contacts_wt = util.sidechain_contacted_atoms(model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
             mutated_model, collisions = util.mutate_to_proline(model, chain_id, res_id, dssp_dict, rep_prolines, collision_th)
-            contacts_pro = util.sidechain_contacted_atoms(mutated_model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
             # output
             if len(collisions) <= para.max_collisions:
-                aa = AA3to1[res.resname]
+                contacts_pro = util.sidechain_contacted_atoms(mutated_model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
+                aa = util.AA3to1[res.resname]
                 n_collisions = len(collisions)
                 n_contacts_wt = len(contacts_wt)
                 n_contacts_pro = len(contacts_pro)
