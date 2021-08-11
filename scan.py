@@ -6,7 +6,7 @@ import argparse
 
 from Bio.PDB.DSSP import make_dssp_dict
 from PDBtoDSSP import pdb_to_dssp
-from util import BackboneCompatibility, RepresentiveProlines, sidechain_compatibility
+import util
 
 from Bio.PDB import PDBParser
 
@@ -21,8 +21,8 @@ def parse():
     parser.add_argument('pdbfile', help='Input structure (in pdb format)')
     parser.add_argument('chains', help='Chain ID(s) for the chain to be checked for proline compatibility (example: "AB")')
     parser.add_argument('--prob_cutoff', help='Probability cutoff for the compatible mainchain phi-psi angles (default: 0.01)', default=0.01, type=float)
-    parser.add_argument('--dist_collision', help='Atom distance threshold below which will be considered as a collision (default: 3.0)', default=3.0, type=float)
-    parser.add_argument('--dmin_contact', help='Minimum distance to be considered as a contact (default: 3.1)', default=3.1, type=float)
+    parser.add_argument('--dist_collision', help='Atom distance threshold below which will be considered as a collision (default: 2.8)', default=2.8, type=float)
+    parser.add_argument('--dmin_contact', help='Minimum distance to be considered as a contact (default: 3.0)', default=3.0, type=float)
     parser.add_argument('--dmax_contact', help='Maximum distance to be considered as a contact (default: 4.5)', default=4.5, type=float)
     parser.add_argument('--max_collisions', help='Maximum allowed collision between side chain of introduced proline and the rest part of the protein (default: 1)', default=1, type=int)
     parser.add_argument('-o', '--output', help='output selected fasta sequences (default: stdout).', default=sys.stdout, type=argparse.FileType('wt'))
@@ -56,26 +56,26 @@ def main():
     for chain_id in para.chains:
         chain = model[chain_id]
         # Backbone compatibility
-        proline_bc = BackboneCompatibility('data/rama8000-transpro.data')
+        proline_bc = util.BackboneCompatibility('data/rama8000-transpro.data')
         bbcompatible_sites = proline_bc.compatible_sites(chain, dssp_dict, prob_cutoff)
         # Sidechain compatibility
         proline_conformations = './data/P_-58_37.1.pdb ./data/P_-58_37.2.pdb ./data/P_-60_140.1.pdb ./data/P_-60_140.2.pdb'.split()
-        rep_prolines = RepresentiveProlines(proline_conformations)
+        rep_prolines = util.RepresentiveProlines(proline_conformations)
         for res_id, sse, asa, phi, psi, prob in bbcompatible_sites:
             res = model[chain_id][res_id]
             #if res.resname == 'PRO':  # skip side chain compatibility check for prolines
             #    continue
-            collisions, contacts_wt, contacts_pro = sidechain_compatibility(model, chain_id, res_id,
-                                                                            dssp_dict,
-                                                                            rep_prolines,
-                                                                            collision_th, contact_dmin, contact_dmax)
+            contacts_wt = util.sidechain_contacted_atoms(model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
+            mutated_model, collisions = util.mutate_to_proline(model, chain_id, res_id, dssp_dict, rep_prolines, collision_th)
+            contacts_pro = util.sidechain_contacted_atoms(mutated_model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
             # output
             if len(collisions) <= para.max_collisions:
                 aa = AA3to1[res.resname]
                 n_collisions = len(collisions)
                 n_contacts_wt = len(contacts_wt)
                 n_contacts_pro = len(contacts_pro)
-                print(f'{chain_id}\t{res_id[1]}\t{aa}\t{asa}\t{sse}\t{prob:.3f}\t{n_collisions}\t{n_contacts_pro-n_contacts_wt}')
+                if para.output != sys.stdout:
+                    print(f'{chain_id}\t{res_id[1]}\t{aa}\t{asa}\t{sse}\t{prob:.3f}\t{n_collisions}\t{n_contacts_pro-n_contacts_wt}')
                 print(f'{chain_id}\t{res_id[1]}\t{aa}\t{asa}\t{sse}\t{prob:.3f}\t{n_collisions}\t{n_contacts_pro-n_contacts_wt}\t{n_contacts_wt}\t{n_contacts_pro}\t{phi}\t{psi}', file=para.output)
 
 

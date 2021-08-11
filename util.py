@@ -80,14 +80,12 @@ class RepresentiveProlines:
                 dist = rep_dist
         return self.prolines[best_match_phi_psi]
 
-def sidechain_compatibility(model, chain_id, res_id, dssp_dict, rep_prolines, collision_th, contact_dmin, contact_dmax):
+def mutate_to_proline(model, chain_id, res_id, dssp_dict, rep_prolines, collision_th):
     aa, sse, asa, phi, psi = dssp_dict[(chain_id, res_id)][:5]
-    # number of contacts in WT
-    contacts_wt = sidechain_contacted_atoms(model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
-    #
     closest_prolines = rep_prolines.get(phi, psi)
     min_n_collision = 100
     min_collisions = None
+    mutated_model = None
     for pro in closest_prolines:
         working_model = model.copy()
         # backbone superimposition
@@ -99,22 +97,13 @@ def sidechain_compatibility(model, chain_id, res_id, dssp_dict, rep_prolines, co
         working_model[chain_id].detach_child(res_id)
         moving_res.id = res_id
         working_model[chain_id].insert(i, moving_res)
-        # collision, contacts afer the replacement
+        # choose the proline conformation leads to fewer collisions
         collisions = sidechain_contacted_atoms(working_model, chain_id, res_id, dist_range=(0,collision_th))
         if len(collisions) < min_n_collision:
             min_collisions = collisions
             min_n_collision = len(collisions)
-            contacts_pro = sidechain_contacted_atoms(working_model, chain_id, res_id, dist_range=(contact_dmin,contact_dmax))
-            ## For manual inspection
-            #if res_id == (' ', 39, ' '):
-            #    print(pro)
-            #    for atom, sqdist in collisions:
-            #        print(atom, atom.parent, math.sqrt(sqdist))
-            #    io = PDBIO()
-            #    io.set_structure(working_model)
-            #    io.save("mutated.pdb")
-            ## End #For manual inspection
-    return (min_collisions, contacts_wt, contacts_pro)
+            mutated_model = working_model
+    return (mutated_model, min_collisions)
 
 def count_to_res(res):
     for i, r in enumerate(res.parent):
